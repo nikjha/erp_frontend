@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Box, Stack, TextField, Button, Chip, MenuItem, Typography, IconButton,
-  Collapse, Dialog, DialogTitle, DialogContent, DialogActions, Tooltip, Divider,
+  Dialog, DialogTitle, DialogContent, DialogActions, Tooltip, Divider,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
@@ -133,61 +133,10 @@ export default function TodosPanel({ contentTypeId, objectId }: Props) {
         <Typography variant="body2" color="text.secondary">
           {todos.length} task{todos.length === 1 ? "" : "s"}
         </Typography>
-        <Button size="small" startIcon={<AddIcon />} onClick={() => setShowForm((v) => !v)}>
-          {showForm ? "Cancel" : "Add task"}
+        <Button size="small" startIcon={<AddIcon />} onClick={() => setShowForm(true)}>
+          Add task
         </Button>
       </Stack>
-
-      <Collapse in={showForm}>
-        <Stack spacing={1.5} sx={{ mb: 2, p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
-          <TextField
-            size="small" fullWidth label="What needs doing?"
-            value={title} onChange={(e) => setTitle(e.target.value)}
-          />
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-            <TextField
-              select size="small" fullWidth label="Category"
-              value={categoryId} onChange={(e) => setCategoryId(e.target.value)}
-              helperText={categories.length === 0 ? "No categories defined yet" : undefined}
-            >
-              <MenuItem value=""><em>Uncategorised</em></MenuItem>
-              {categories.map((c) => (
-                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select size="small" fullWidth label="Assign to"
-              value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}
-              helperText="They'll be notified"
-            >
-              <MenuItem value=""><em>Myself</em></MenuItem>
-              {users.map((u) => (
-                <MenuItem key={u.id} value={u.id}>{u.employee_name || u.username}</MenuItem>
-              ))}
-            </TextField>
-          </Stack>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-            <TextField
-              select size="small" fullWidth label="Priority"
-              value={priority} onChange={(e) => setPriority(e.target.value)}
-            >
-              {PRIORITIES.map((p) => (
-                <MenuItem key={p} value={p}>{p[0].toUpperCase() + p.slice(1)}</MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              size="small" fullWidth label="Due" type="date"
-              InputLabelProps={{ shrink: true }}
-              value={dueDate} onChange={(e) => setDueDate(e.target.value)}
-            />
-          </Stack>
-          <Box>
-            <Button size="small" variant="contained" disabled={!title.trim()} onClick={handleAdd}>
-              Create task
-            </Button>
-          </Box>
-        </Stack>
-      </Collapse>
 
       <Stack divider={<Divider flexItem />}>
         {todos.length === 0 && (
@@ -269,8 +218,64 @@ export default function TodosPanel({ contentTypeId, objectId }: Props) {
         })}
       </Stack>
 
+      <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add New Task</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              autoFocus
+              size="small" fullWidth label="What needs doing?"
+              value={title} onChange={(e) => setTitle(e.target.value)}
+            />
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField
+                select size="small" fullWidth label="Category"
+                value={categoryId} onChange={(e) => setCategoryId(e.target.value)}
+                helperText={categories.length === 0 ? "No categories defined yet" : undefined}
+              >
+                <MenuItem value=""><em>Uncategorised</em></MenuItem>
+                {categories.map((c) => (
+                  <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                select size="small" fullWidth label="Assign to"
+                value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}
+                helperText="They'll be notified"
+              >
+                <MenuItem value=""><em>Myself</em></MenuItem>
+                {users.map((u) => (
+                  <MenuItem key={u.id} value={u.id}>{u.employee_name || u.username}</MenuItem>
+                ))}
+              </TextField>
+            </Stack>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField
+                select size="small" fullWidth label="Priority"
+                value={priority} onChange={(e) => setPriority(e.target.value)}
+              >
+                {PRIORITIES.map((p) => (
+                  <MenuItem key={p} value={p}>{p[0].toUpperCase() + p.slice(1)}</MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                size="small" fullWidth label="Due" type="date"
+                slotProps={{ inputLabel: { shrink: true } }}
+                value={dueDate} onChange={(e) => setDueDate(e.target.value)}
+              />
+            </Stack>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowForm(false)}>Cancel</Button>
+          <Button variant="contained" disabled={!title.trim()} onClick={handleAdd}>
+            Create task
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={!!closing} onClose={() => setClosing(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Close “{closing?.title}”</DialogTitle>
+        <DialogTitle>Close "{closing?.title}"</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus fullWidth multiline minRows={2} size="small" sx={{ mt: 1 }}

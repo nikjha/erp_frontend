@@ -102,13 +102,13 @@ export default function FilterBuilder({ fields, conditions, onChange }: Props) {
         <Stack direction="row" spacing={1} sx={{ width: "100%" }}>
           <TextField
             size="small" fullWidth label="From" type={inputType}
-            InputLabelProps={{ shrink: true }}
+            slotProps={{ inputLabel: { shrink: true } }}
             value={(condition.value as string) ?? ""}
             onChange={(e) => patch(condition.id, { value: e.target.value })}
           />
           <TextField
             size="small" fullWidth label="To" type={inputType}
-            InputLabelProps={{ shrink: true }}
+            slotProps={{ inputLabel: { shrink: true } }}
             value={(condition.value2 as string) ?? ""}
             onChange={(e) => patch(condition.id, { value2: e.target.value })}
           />
@@ -140,7 +140,7 @@ export default function FilterBuilder({ fields, conditions, onChange }: Props) {
     }
 
     if (field.type === "date" || field.type === "datetime") {
-      return <TextField {...commonProps} type="date" InputLabelProps={{ shrink: true }} />;
+      return <TextField {...commonProps} type="date" slotProps={{ inputLabel: { shrink: true } }} />;
     }
 
     if (field.type === "number" || field.type === "decimal") {

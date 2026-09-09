@@ -14,6 +14,7 @@ interface Props {
   submitLabel?: string;
   /** Field names the caller's role may see but not change. */
   readOnlyFields?: string[];
+  onCancel?: () => void;
 }
 
 /**
@@ -37,7 +38,7 @@ function FieldRow({
     <Box
       sx={{
         display: "grid",
-        gridTemplateColumns: { xs: "1fr", sm: "minmax(140px, 190px) 1fr" },
+        gridTemplateColumns: { xs: "1fr", sm: "minmax(140px, 190px) 1.3fr" },
         alignItems: "start",
         columnGap: 2,
         rowGap: 0.5,
@@ -49,7 +50,7 @@ function FieldRow({
           component="label"
           htmlFor={`field-${field.name}`}
           variant="body2"
-          sx={{ fontWeight: 600, color: "text.secondary", lineHeight: 1.3 }}
+          sx={{ fontWeight: 600, color: "text.secondary", lineHeight: 1.3, fontSize: "0.86rem" }}
         >
           {field.label}
           {field.required && (
@@ -68,7 +69,7 @@ function FieldRow({
 }
 
 export default function GenericForm({
-  module, initialValues, onSubmit, submitLabel = "Save", readOnlyFields = [],
+  module, initialValues, onSubmit, submitLabel = "Save", readOnlyFields = [], onCancel,
 }: Props) {
   const formFields = module.fields.filter((f) => f.showInForm);
   const [values, setValues] = useState<Record<string, unknown>>(initialValues ?? {});
@@ -115,6 +116,7 @@ export default function GenericForm({
       error: !!errors[f.name],
       helperText: errors[f.name] || undefined,
       disabled,
+      sx: { "& .MuiInputBase-input": { fontSize: "0.86rem" }, "& .MuiInputLabel-root": { fontSize: "0.86rem" } }
     };
 
     if (f.type === "boolean") {
@@ -190,7 +192,7 @@ export default function GenericForm({
         <TextField
           {...shared}
           type={f.type === "date" ? "date" : "datetime-local"}
-          InputLabelProps={{ shrink: true }}
+          slotProps={{ inputLabel: { shrink: true } }}
           value={(values[f.name] as string) ?? ""}
           onChange={(e) => setField(f.name, e.target.value)}
         />
@@ -208,7 +210,7 @@ export default function GenericForm({
   }
 
   return (
-    <Box>
+    <Box component="form" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
       <Box
         sx={{
           display: "grid",
@@ -228,7 +230,12 @@ export default function GenericForm({
         })}
       </Box>
 
-      <Stack direction="row" justifyContent="flex-end" sx={{ mt: 3 }}>
+      <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 3, display: "none" }}>
+        {onCancel && (
+          <Button variant="outlined" onClick={onCancel} disabled={saving}>
+            Cancel
+          </Button>
+        )}
         <Button variant="contained" onClick={handleSubmit} disabled={saving}>
           {saving ? "Saving..." : submitLabel}
         </Button>

@@ -37,10 +37,16 @@ export const intentHeaders = (intent: "import" | "export") => ({
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = tokenStore.getAccess();
   if (token) config.headers.set("Authorization", `Bearer ${token}`);
-  const tenantId = localStorage.getItem("erp_tenant_id");
-  if (tenantId) config.headers.set("X-Tenant-ID", tenantId);
-  const companyId = localStorage.getItem("erp_company_id");
-  if (companyId) config.headers.set("X-Company-ID", companyId);
+
+  // Don't send tenant/company headers for auth endpoints
+  const isAuthEndpoint = config.url?.includes("/api/auth/");
+  if (!isAuthEndpoint) {
+    const tenantId = localStorage.getItem("erp_tenant_id");
+    if (tenantId) config.headers.set("X-Tenant-ID", tenantId);
+    const companyId = localStorage.getItem("erp_company_id");
+    if (companyId) config.headers.set("X-Company-ID", companyId);
+  }
+
   return config;
 });
 

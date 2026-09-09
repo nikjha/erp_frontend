@@ -8,7 +8,7 @@ import {
   type GridColumnVisibilityModel,
 } from "@mui/x-data-grid";
 import {
-  Box, Toolbar, Typography, TextField, IconButton, Button, Menu, MenuItem,
+  Box, Typography, TextField, IconButton, Button, Menu, MenuItem,
   Chip, Checkbox, ListItemText, ListItemIcon, Tooltip, Stack, Dialog, DialogTitle,
   DialogContent, DialogActions, Divider, Accordion, AccordionSummary,
   AccordionDetails, FormControlLabel, Switch, Alert,
@@ -27,6 +27,12 @@ import WorkspacesIcon from "@mui/icons-material/Workspaces";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import PersonIcon from "@mui/icons-material/Person";
 import GroupsIcon from "@mui/icons-material/Groups";
+import SearchIcon from "@mui/icons-material/Search";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
+import BusinessIcon from "@mui/icons-material/Business";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import Avatar from "@mui/material/Avatar";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSnackbar } from "notistack";
 
@@ -41,6 +47,47 @@ import BulkActionsToolbar from "./BulkActionsToolbar";
 import ImportDialog from "./ImportDialog";
 import FilterBuilder from "./FilterBuilder";
 
+/**
+ * Generate consistent color for a given string using hash
+ */
+function stringToColor(str: string): string {
+  const colors = [
+    "#6366F1", // Indigo
+    "#8B5CF6", // Purple
+    "#EC4899", // Pink
+    "#EF4444", // Red
+    "#F59E0B", // Amber
+    "#10B981", // Emerald
+    "#14B8A6", // Teal
+    "#06B6D4", // Cyan
+    "#3B82F6", // Blue
+    "#F97316", // Orange
+  ];
+
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  return colors[Math.abs(hash) % colors.length];
+}
+
+/**
+ * Get initials from a name
+ */
+function getInitials(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+}
+
+/**
+ * Converts a module field configuration to a DataGrid column definition.
+ * Handles different field types (boolean, datetime, date, select) with custom rendering.
+ * Enhanced with improved status chip styling and color coding.
+ */
 function fieldToColumn(field: ModuleConfig["fields"][number]): GridColDef {
   const base: GridColDef = {
     field: field.name,
@@ -48,25 +95,182 @@ function fieldToColumn(field: ModuleConfig["fields"][number]): GridColDef {
     width: field.width ?? 150,
     sortable: field.sortable ?? false,
     filterable: false, // filtering handled by our own dynamic filter builder (server-side)
+    align: "left",
+    headerAlign: "left",
   };
-  if (field.type === "boolean") {
-    return { ...base, type: "boolean" };
+
+  // Special handling for name/company field - add avatar with initials
+  if (field.name === "name" || field.label.toLowerCase().includes("company")) {
+    return {
+      ...base,
+      width: field.width ?? 250,
+      renderCell: (params) => {
+        const name = String(params.value ?? "");
+        if (!name) return "";
+        const initials = getInitials(name);
+        const bgColor = stringToColor(name);
+
+        return (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Avatar
+              sx={{
+                width: 26,
+                height: 26,
+                backgroundColor: bgColor,
+                fontSize: "0.7rem",
+                fontWeight: 600,
+              }}
+            >
+              {initials}
+            </Avatar>
+            <Box component="span" sx={{ fontWeight: 500 }}>
+              {name}
+            </Box>
+          </Box>
+        );
+      },
+    };
   }
+
+  // Add icon for type field
+  if (field.name === "type" || field.label.toLowerCase() === "type") {
+    return {
+      ...base,
+      renderCell: (params) => {
+        const value = params.value;
+        if (!value) return "";
+        const isCustomer = String(value).toLowerCase().includes("customer");
+        const isVendor = String(value).toLowerCase().includes("vendor");
+
+        return (
+          <Chip
+            label={String(value)}
+            size="small"
+            variant="outlined"
+            sx={{
+              borderRadius: "16px",
+              backgroundColor: isCustomer ? "#E0E7FF" : isVendor ? "#F3E8FF" : "#F3F4F6",
+              borderColor: isCustomer ? "#818CF8" : isVendor ? "#C084FC" : "#D1D5DB",
+              color: isCustomer ? "#4338CA" : isVendor ? "#7C3AED" : "#6B7280",
+              fontWeight: 500,
+              fontSize: "0.75rem",
+            }}
+          />
+        );
+      },
+    };
+  }
+
+  // Add icon for location field
+  if (field.name === "location" || field.label.toLowerCase().includes("location") || field.label.toLowerCase().includes("address")) {
+    return {
+      ...base,
+      renderCell: (params) => {
+        if (!params.value) return "";
+        return (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+            <LocationOnOutlinedIcon sx={{ fontSize: 16, color: "#6B7280" }} />
+            <Box component="span" sx={{ color: "text.secondary" }}>
+              {String(params.value)}
+            </Box>
+          </Box>
+        );
+      },
+    };
+  }
+
+  // Add icon for email field
+  if (field.name === "email" || field.label.toLowerCase() === "email") {
+    return {
+      ...base,
+      renderCell: (params) => {
+        if (!params.value) return "";
+        return (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+            <EmailOutlinedIcon sx={{ fontSize: 16, color: "#6B7280" }} />
+            <Box component="span" sx={{ color: "text.secondary" }}>
+              {String(params.value)}
+            </Box>
+          </Box>
+        );
+      },
+    };
+  }
+
+  if (field.type === "boolean") {
+    // Enhanced boolean rendering with "Yes"/"No" chips
+    return {
+      ...base,
+      renderCell: (params) => {
+        if (params.value === null || params.value === undefined) return "";
+        const isYes = Boolean(params.value);
+        return (
+          <Chip
+            size="small"
+            label={isYes ? "Yes" : "No"}
+            sx={{
+              backgroundColor: isYes ? "#D1FAE5" : "#FEE2E2",
+              color: isYes ? "#065F46" : "#991B1B",
+              fontWeight: 600,
+            }}
+          />
+        );
+      },
+    };
+  }
+
   if (field.type === "datetime" || field.type === "date") {
     return {
       ...base,
       valueFormatter: (value: unknown) => (value ? new Date(value as string).toLocaleString() : ""),
     };
   }
+
+  // Enhanced select field rendering with color-coded status chips with dot indicator
   if (field.type === "select") {
     return {
       ...base,
       renderCell: (params) => {
         const opt = field.options?.find((o) => o.value === params.value);
-        return <Chip size="small" label={opt?.label ?? String(params.value ?? "")} />;
+        const label = opt?.label ?? String(params.value ?? "");
+        const value = String(params.value ?? "").toLowerCase();
+
+        // Color mapping for common status values based on the design screenshots
+        let dotColor = "#6366F1"; // Default purple/indigo
+
+        // Status-specific color schemes matching the design
+        if (value === "active" || value === "completed" || value === "confirmed" || value === "paid" || value === "shipped") {
+          dotColor = "#10B981"; // Green
+        } else if (value === "inactive" || value === "pending" || value === "pending_approval") {
+          dotColor = "#F59E0B"; // Orange/Yellow
+        } else if (value === "blocked" || value === "cancelled" || value === "rejected" || value === "overdue") {
+          dotColor = "#EF4444"; // Red
+        } else if (value === "draft") {
+          dotColor = "#6B7280"; // Gray
+        } else if (value === "processing" || value === "partially_paid" || value === "partially_delivered") {
+          dotColor = "#3B82F6"; // Blue
+        }
+
+        return (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                backgroundColor: dotColor,
+                flexShrink: 0,
+              }}
+            />
+            <Box component="span">
+              {label}
+            </Box>
+          </Box>
+        );
       },
     };
   }
+
   return base;
 }
 
@@ -110,7 +314,8 @@ export default function GenericListView({ module }: Props) {
   const [groupBy, setGroupBy] = useState<string[]>([]);
   const [selection, setSelection] = useState<GridRowSelectionModel>([]);
   const [colVisibility, setColVisibility] = useState<GridColumnVisibilityModel>({});
-  const [colMenuAnchor, setColMenuAnchor] = useState<null | HTMLElement>(null);
+  const [colDialogOpen, setColDialogOpen] = useState(false);
+  const [pendingColVisibility, setPendingColVisibility] = useState<GridColumnVisibilityModel>({});
   const [settingsMenuAnchor, setSettingsMenuAnchor] = useState<null | HTMLElement>(null);
   const [exportMenuAnchor, setExportMenuAnchor] = useState<null | HTMLElement>(null);
   const [groupMenuAnchor, setGroupMenuAnchor] = useState<null | HTMLElement>(null);
@@ -132,7 +337,9 @@ export default function GenericListView({ module }: Props) {
   });
 
   const rows = useMemo(() => data?.results ?? [], [data]);
-  const columns: GridColDef[] = useMemo(() => listFields.map(fieldToColumn), [listFields]);
+  const columns: GridColDef[] = useMemo(() => [
+    ...listFields.map(fieldToColumn),
+  ], [listFields]);
 
   const handleBulkDelete = useCallback(async () => {
     const ids = selection.map(String);
@@ -199,6 +406,7 @@ export default function GenericListView({ module }: Props) {
 
   const isGrouped = groupBy.length > 0;
 
+  // Enhanced DataGrid configuration with improved styling matching reference design
   const gridProps = {
     columns,
     // One selection model can't span several grids coherently, so grouped
@@ -210,79 +418,822 @@ export default function GenericListView({ module }: Props) {
     onColumnVisibilityModelChange: setColVisibility,
     onRowClick: (params: { id: string | number }) => navigate(`/${module.key}/${params.id}`),
     disableRowSelectionOnClick: true,
-    density: "compact" as const,
-    sx: { backgroundColor: "background.paper", cursor: "pointer" },
+    disableColumnMenu: true,
+    sx: {
+      border: "none",
+      backgroundColor: "background.paper",
+      cursor: "pointer",
+      "& .MuiDataGrid-cell": {
+        display: "flex",
+        alignItems: "center",
+        py: 0,
+        px: 2,
+        borderBottom: "none",
+        borderTop: "none",
+      },
+      "& .MuiDataGrid-columnHeaders": {
+        backgroundColor: "#FAFAFA",
+        borderBottom: "1px solid #E5E7EB",
+        borderRadius: 0,
+      },
+      "& .MuiDataGrid-columnHeader": {
+        fontSize: "0.6875rem",
+        fontWeight: 600,
+        color: "#9CA3AF",
+        textTransform: "uppercase",
+        letterSpacing: "0.05em",
+        borderBottom: "none",
+        padding: "0 12px",
+        "&:focus": {
+          outline: "none",
+        },
+        "&:focus-within": {
+          outline: "none",
+        },
+      },
+      "& .MuiDataGrid-columnHeader.MuiDataGrid-columnHeaderCheckbox": {
+        padding: "0 5px",
+      },
+      "& .MuiDataGrid-columnHeaderTitle": {
+        fontWeight: 600,
+      },
+      "& .MuiDataGrid-columnSeparator": {
+        display: "none",
+      },
+      "& .MuiDataGrid-columnSeparator--resizable": {
+        height: "40px !important",
+      },
+      "& .MuiDataGrid-row": {
+        minHeight: "36px !important",
+        maxHeight: "36px !important",
+        alignItems: "center",
+        borderBottom: "1px solid #F3F4F6",
+        "&:hover": {
+          backgroundColor: "#F9FAFB",
+        },
+        "&.Mui-selected": {
+          backgroundColor: "#EEF2FF",
+          "&:hover": {
+            backgroundColor: "#E0E7FF",
+          },
+        },
+      },
+      "& .MuiDataGrid-filler": {
+        display: "none",
+      },
+      "& .MuiDataGrid-footerContainer": {
+        borderTop: "1px solid #E5E7EB",
+        backgroundColor: "#FFFFFF",
+        minHeight: "40px !important",
+        maxHeight: "40px !important",
+        height: "40px !important",
+        paddingRight: { sm: "2px" },
+      },
+      "& .MuiTablePagination-root": {
+        color: "#6B7280",
+      },
+      "& .MuiTablePagination-toolbar": {
+        minHeight: "40px !important",
+        maxHeight: "40px !important",
+        height: "40px !important",
+      },
+      "& .MuiTablePagination-select": {
+        fontSize: "0.86rem",
+      },
+      "& .MuiTablePagination-selectLabel": {
+        fontSize: "0.86rem",
+        lineHeight: 1,
+        margin: 0,
+      },
+      "& .MuiTablePagination-displayedRows": {
+        fontSize: "0.86rem",
+        color: "#6B7280",
+        lineHeight: 1,
+        margin: 0,
+      },
+      "& .MuiDataGrid-scrollbarFiller": {
+        minHeight: "0 !important",
+      },
+      "& .MuiDataGrid-scrollbar--vertical .MuiDataGrid-scrollbarContent": {
+        height: "calc(100% - 10px) !important",
+      },
+    },
   };
 
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <Toolbar disableGutters sx={{ px: 2, py: 1.5, gap: 1, flexWrap: "wrap" }}>
-        <Typography variant="h6" sx={{ mr: 2 }}>{module.label}</Typography>
-
-        <TextField
-          size="small"
-          placeholder={`Search ${module.label.toLowerCase()}...`}
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-          sx={{ minWidth: 240 }}
-        />
-
+      {/* Quick Links Bar - Desktop */}
+      <Box
+        sx={{
+          px: { xs: 2, sm: 3 },
+          py: 0.45,
+          backgroundColor: "#F9FAFB",
+          borderBottom: "1px solid #E5E7EB",
+          display: { xs: "none", md: "flex" },
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Typography
+            sx={{
+              color: "text.primary",
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              pl: 1,
+            }}
+          >
+            Quick Links
+          </Typography>
+          <Divider orientation="vertical" flexItem sx={{ borderColor: "#D1D5DB", borderWidth: 1 }} />
+          <Button
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              fontSize: "0.75rem",
+              fontWeight: 400,
+              minHeight: 0,
+              py: 0.3,
+              "&:hover": { backgroundColor: "transparent", color: "primary.main" },
+            }}
+          >
+            New Customers
+          </Button>
+          <Button
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              fontSize: "0.75rem",
+              fontWeight: 400,
+              minHeight: 0,
+              py: 0.3,
+              "&:hover": { backgroundColor: "transparent", color: "primary.main" },
+            }}
+          >
+            New Leads
+          </Button>
+          <Button
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              fontSize: "0.75rem",
+              fontWeight: 400,
+              minHeight: 0,
+              py: 0.3,
+              "&:hover": { backgroundColor: "transparent", color: "primary.main" },
+            }}
+          >
+            Quotations
+          </Button>
+          <Button
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              fontSize: "0.75rem",
+              fontWeight: 400,
+              minHeight: 0,
+              py: 0.3,
+              "&:hover": { backgroundColor: "transparent", color: "primary.main" },
+            }}
+          >
+            Invoices
+          </Button>
+          <Button
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              fontSize: "0.75rem",
+              fontWeight: 400,
+              minHeight: 0,
+              py: 0.3,
+              "&:hover": { backgroundColor: "transparent", color: "primary.main" },
+            }}
+          >
+            Products
+          </Button>
+          <Button
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              fontSize: "0.75rem",
+              fontWeight: 400,
+              minHeight: 0,
+              py: 0.3,
+              "&:hover": { backgroundColor: "transparent", color: "primary.main" },
+            }}
+          >
+            Reports
+          </Button>
+          <Button
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              fontSize: "0.75rem",
+              fontWeight: 400,
+              minHeight: 0,
+              py: 0.3,
+              "&:hover": { backgroundColor: "transparent", color: "primary.main" },
+            }}
+          >
+            Activities
+          </Button>
+          <Divider orientation="vertical" flexItem sx={{ borderColor: "#D1D5DB", borderWidth: 1 }} />
+        </Stack>
         <Button
           size="small"
-          startIcon={<FilterListIcon />}
-          onClick={() => {
-            // Seed the dialog with the live filters, plus an empty row so
-            // there is always something to type into.
-            setPendingConditions(
-              conditions.length ? conditions : [newCondition(filterableFields[0])]
-            );
-            setFilterDialogOpen(true);
+          startIcon={<Typography sx={{ fontSize: "1rem" }}>❓</Typography>}
+          sx={{
+            textTransform: "none",
+            color: "text.secondary",
+            fontSize: "0.75rem",
+            fontWeight: 400,
+            minHeight: 0,
+            py: 0.3,
+            "&:hover": { backgroundColor: "transparent", color: "primary.main" },
           }}
         >
-          Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+          Need Help?
         </Button>
+      </Box>
 
-        <Button
-          size="small"
-          startIcon={<WorkspacesIcon />}
-          onClick={(e) => setGroupMenuAnchor(e.currentTarget)}
+      {/* Quick Links Bar - Mobile */}
+      <Box
+        sx={{
+          backgroundColor: "#F9FAFB",
+          borderBottom: "1px solid #E5E7EB",
+          display: { xs: "flex", md: "none" },
+          alignItems: "center",
+        }}
+      >
+        {/* Static Label */}
+        <Typography
+          sx={{
+            color: "text.primary",
+            fontSize: "0.7rem",
+            fontWeight: 700,
+            pl: 1.5,
+            pr: 1,
+            py: 0.75,
+            flexShrink: 0,
+            whiteSpace: "nowrap",
+          }}
         >
-          Group by{groupBy.length > 0 ? ` (${groupBy.length})` : ""}
-        </Button>
+          Quick Links
+        </Typography>
+        <Divider orientation="vertical" flexItem sx={{ borderColor: "#D1D5DB" }} />
 
-        <Tooltip title="Saved views">
-          <IconButton size="small" onClick={(e) => setViewsMenuAnchor(e.currentTarget)}>
-            <BookmarkBorderIcon />
-          </IconButton>
-        </Tooltip>
-
-        <Tooltip title="Refresh">
-          <IconButton size="small" onClick={() => refetch()}><RefreshIcon /></IconButton>
-        </Tooltip>
-
-        <Box sx={{ flexGrow: 1 }} />
-
-        {/* Right-hand action cluster: columns, settings, then the primary
-            create button — the column picker sits next to New, where the
-            things that change what you're looking at belong. */}
-        <Tooltip title="Show / hide columns">
-          <IconButton size="small" onClick={(e) => setColMenuAnchor(e.currentTarget)}>
-            <ViewColumnIcon />
-          </IconButton>
-        </Tooltip>
-
-        <Tooltip title="Settings">
-          <IconButton size="small" onClick={(e) => setSettingsMenuAnchor(e.currentTarget)}>
-            <SettingsIcon />
-          </IconButton>
-        </Tooltip>
-
-        {canCreate && (
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate(`/${module.key}/new`)}>
-            New {module.labelSingular}
+        {/* Scrollable Links */}
+        <Box
+          sx={{
+            overflowX: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: 0,
+            flexGrow: 1,
+            "&::-webkit-scrollbar": {
+              display: "none",
+            },
+            scrollbarWidth: "none",
+          }}
+        >
+          <Button
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              fontSize: "0.7rem",
+              fontWeight: 400,
+              minWidth: "auto",
+              minHeight: 0,
+              py: 0.75,
+              px: 1.5,
+              whiteSpace: "nowrap",
+              borderRadius: 0,
+              "&:hover": { backgroundColor: "rgba(99, 102, 241, 0.08)", color: "primary.main" },
+            }}
+          >
+            New Customers
           </Button>
-        )}
-      </Toolbar>
+          <Button
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              fontSize: "0.7rem",
+              fontWeight: 400,
+              minWidth: "auto",
+              minHeight: 0,
+              py: 0.75,
+              px: 1.5,
+              whiteSpace: "nowrap",
+              borderRadius: 0,
+              "&:hover": { backgroundColor: "rgba(99, 102, 241, 0.08)", color: "primary.main" },
+            }}
+          >
+            New Leads
+          </Button>
+          <Button
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              fontSize: "0.7rem",
+              fontWeight: 400,
+              minWidth: "auto",
+              minHeight: 0,
+              py: 0.75,
+              px: 1.5,
+              whiteSpace: "nowrap",
+              borderRadius: 0,
+              "&:hover": { backgroundColor: "rgba(99, 102, 241, 0.08)", color: "primary.main" },
+            }}
+          >
+            Quotations
+          </Button>
+          <Button
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              fontSize: "0.7rem",
+              fontWeight: 400,
+              minWidth: "auto",
+              minHeight: 0,
+              py: 0.75,
+              px: 1.5,
+              whiteSpace: "nowrap",
+              borderRadius: 0,
+              "&:hover": { backgroundColor: "rgba(99, 102, 241, 0.08)", color: "primary.main" },
+            }}
+          >
+            Invoices
+          </Button>
+          <Button
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              fontSize: "0.7rem",
+              fontWeight: 400,
+              minWidth: "auto",
+              minHeight: 0,
+              py: 0.75,
+              px: 1.5,
+              whiteSpace: "nowrap",
+              borderRadius: 0,
+              "&:hover": { backgroundColor: "rgba(99, 102, 241, 0.08)", color: "primary.main" },
+            }}
+          >
+            Products
+          </Button>
+          <Button
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              fontSize: "0.7rem",
+              fontWeight: 400,
+              minWidth: "auto",
+              minHeight: 0,
+              py: 0.75,
+              px: 1.5,
+              whiteSpace: "nowrap",
+              borderRadius: 0,
+              "&:hover": { backgroundColor: "rgba(99, 102, 241, 0.08)", color: "primary.main" },
+            }}
+          >
+            Reports
+          </Button>
+          <Button
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              fontSize: "0.7rem",
+              fontWeight: 400,
+              minWidth: "auto",
+              minHeight: 0,
+              py: 0.75,
+              px: 1.5,
+              whiteSpace: "nowrap",
+              borderRadius: 0,
+              "&:hover": { backgroundColor: "rgba(99, 102, 241, 0.08)", color: "primary.main" },
+            }}
+          >
+            Activities
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Main Toolbar */}
+      <Box
+        sx={{
+          px: { xs: 1.5, sm: 3 },
+          py: { xs: 0.75, sm: 1.25 },
+          backgroundColor: "background.paper",
+          borderBottom: "1px solid #E5E7EB",
+        }}
+      >
+        {/* Desktop Layout */}
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={{ xs: 1, md: 1.5 }}
+          alignItems={{ xs: "stretch", md: "center" }}
+          sx={{
+            justifyContent: "space-between",
+            display: { xs: "none", md: "flex" }
+          }}
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <BusinessIcon sx={{ color: "#6366F1", fontSize: { xs: 20, sm: 22 } }} />
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 600,
+                color: "text.primary",
+                fontSize: { xs: "1rem", sm: "1.125rem" },
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+              }}
+            >
+              {module.label}
+              <Chip
+                label={data?.count ?? 0}
+                size="small"
+                sx={{
+                  height: 20,
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  backgroundColor: "#F3F4F6",
+                  color: "#6B7280",
+                }}
+              />
+            </Typography>
+          </Stack>
+
+          <Stack direction="row" spacing={{ xs: 1, sm: 1.5 }} alignItems="center" sx={{ flex: { md: 1 }, justifyContent: { xs: "space-between", md: "flex-end" }, flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+          <TextField
+            size="small"
+            placeholder={`Search ${module.label.toLowerCase()}...`}
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ color: "text.secondary", mr: 1, fontSize: 20 }} />,
+            }}
+            sx={{
+              width: { xs: "100%", sm: 280, md: 380 },
+              "& .MuiOutlinedInput-root": {
+                backgroundColor: "#FFFFFF",
+                borderRadius: 2,
+                "&:hover": {
+                  backgroundColor: "#F9FAFB",
+                },
+                "& fieldset": {
+                  borderColor: "#E5E7EB",
+                },
+                "&:hover fieldset": {
+                  borderColor: "#D1D5DB",
+                },
+                "&.Mui-focused fieldset": {
+                  borderColor: "#6366F1",
+                  borderWidth: "1px",
+                },
+              },
+            }}
+          />
+
+          <Box sx={{ display: { xs: "none", sm: "flex" }, gap: { sm: 1, md: 1.5 } }}>
+            <Button
+              size="medium"
+              startIcon={<FilterListIcon sx={{ fontSize: 18 }} />}
+              endIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />}
+              variant="outlined"
+              onClick={() => {
+                setPendingConditions(
+                  conditions.length ? conditions : [newCondition(filterableFields[0])]
+                );
+                setFilterDialogOpen(true);
+              }}
+              sx={{
+                borderRadius: 2,
+                textTransform: "none",
+                borderColor: "#E5E7EB",
+                color: "#374151",
+                fontWeight: 500,
+                px: 2,
+                fontSize: "0.86rem",
+                "&:hover": {
+                  borderColor: "#D1D5DB",
+                  backgroundColor: "#F9FAFB",
+                },
+              }}
+            >
+              Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+            </Button>
+
+            <Button
+              size="medium"
+              startIcon={<WorkspacesIcon sx={{ fontSize: 18 }} />}
+              endIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />}
+              variant="outlined"
+              onClick={(e) => setGroupMenuAnchor(e.currentTarget)}
+              sx={{
+                display: { xs: "none", md: "flex" },
+                borderRadius: 2,
+                textTransform: "none",
+                borderColor: "#E5E7EB",
+                color: "#374151",
+                fontWeight: 500,
+                px: 2,
+                fontSize: "0.86rem",
+                "&:hover": {
+                  borderColor: "#D1D5DB",
+                  backgroundColor: "#F9FAFB",
+                },
+              }}
+            >
+              Group by
+            </Button>
+
+            <Tooltip title="Saved Views">
+              <IconButton
+                size="small"
+                onClick={(e) => setViewsMenuAnchor(e.currentTarget)}
+                sx={{
+                  borderRadius: 2,
+                  border: "1px solid #E5E7EB",
+                  "&:hover": { backgroundColor: "#F9FAFB", borderColor: "#D1D5DB" },
+                }}
+              >
+                <BookmarkBorderIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title="Refresh">
+              <IconButton
+                size="small"
+                onClick={() => refetch()}
+                sx={{
+                  borderRadius: 2,
+                  border: "1px solid #E5E7EB",
+                  "&:hover": { backgroundColor: "#F9FAFB", borderColor: "#D1D5DB" },
+                }}
+              >
+                <RefreshIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title="Show / hide columns">
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setPendingColVisibility(colVisibility);
+                  setColDialogOpen(true);
+                }}
+                sx={{
+                  display: { xs: "none", lg: "inline-flex" },
+                  borderRadius: 2,
+                  border: "1px solid #E5E7EB",
+                  "&:hover": { backgroundColor: "#F9FAFB", borderColor: "#D1D5DB" },
+                }}
+              >
+                <ViewColumnIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title="Settings">
+              <IconButton
+                size="small"
+                onClick={(e) => setSettingsMenuAnchor(e.currentTarget)}
+                sx={{
+                  borderRadius: 2,
+                  border: "1px solid #E5E7EB",
+                  "&:hover": { backgroundColor: "#F9FAFB", borderColor: "#D1D5DB" },
+                }}
+              >
+                <SettingsIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+
+          {canCreate && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => navigate(`/${module.key}/new`)}
+              sx={{
+                borderRadius: 2,
+                textTransform: "none",
+                fontWeight: 600,
+                px: 3,
+                fontSize: "0.86rem",
+                backgroundColor: "#6366F1",
+                color: "#FFFFFF",
+                boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+                "&:hover": {
+                  backgroundColor: "#4F46E5",
+                  boxShadow: "0 2px 4px 0 rgba(0, 0, 0, 0.1)",
+                },
+              }}
+            >
+              New {module.labelSingular}
+            </Button>
+          )}
+          </Stack>
+        </Stack>
+
+        {/* Mobile Layout */}
+        <Stack
+          direction="column"
+          spacing={1}
+          sx={{ display: { xs: "flex", md: "none" } }}
+        >
+          {/* Title Row with Icons */}
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Stack direction="row" spacing={1} alignItems="center">
+              <BusinessIcon sx={{ color: "#6366F1", fontSize: 19 }} />
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 600,
+                  color: "text.primary",
+                  fontSize: "1rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                }}
+              >
+                {module.label}
+                <Chip
+                  label={data?.count ?? 0}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: "0.75rem",
+                    fontWeight: 600,
+                    backgroundColor: "#F3F4F6",
+                    color: "#6B7280",
+                  }}
+                />
+              </Typography>
+            </Stack>
+
+            {/* Icon Buttons Row */}
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              <Tooltip title="Filters">
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    setPendingConditions(
+                      conditions.length ? conditions : [newCondition(filterableFields[0])]
+                    );
+                    setFilterDialogOpen(true);
+                  }}
+                  sx={{
+                    borderRadius: 1,
+                    border: "1px solid #E5E7EB",
+                    width: 30,
+                    height: 30,
+                    "&:hover": { backgroundColor: "#F9FAFB", borderColor: "#D1D5DB" },
+                  }}
+                >
+                  <FilterListIcon sx={{ fontSize: 17 }} />
+                </IconButton>
+              </Tooltip>
+
+              <Tooltip title="Group by">
+                <IconButton
+                  size="small"
+                  onClick={(e) => setGroupMenuAnchor(e.currentTarget)}
+                  sx={{
+                    borderRadius: 1,
+                    border: "1px solid #E5E7EB",
+                    width: 30,
+                    height: 30,
+                    "&:hover": { backgroundColor: "#F9FAFB", borderColor: "#D1D5DB" },
+                  }}
+                >
+                  <WorkspacesIcon sx={{ fontSize: 17 }} />
+                </IconButton>
+              </Tooltip>
+
+              <Tooltip title="Saved Views">
+                <IconButton
+                  size="small"
+                  onClick={(e) => setViewsMenuAnchor(e.currentTarget)}
+                  sx={{
+                    borderRadius: 1,
+                    border: "1px solid #E5E7EB",
+                    width: 30,
+                    height: 30,
+                    "&:hover": { backgroundColor: "#F9FAFB", borderColor: "#D1D5DB" },
+                  }}
+                >
+                  <BookmarkBorderIcon sx={{ fontSize: 17 }} />
+                </IconButton>
+              </Tooltip>
+
+              <Tooltip title="Refresh">
+                <IconButton
+                  size="small"
+                  onClick={() => refetch()}
+                  sx={{
+                    borderRadius: 1,
+                    border: "1px solid #E5E7EB",
+                    width: 30,
+                    height: 30,
+                    "&:hover": { backgroundColor: "#F9FAFB", borderColor: "#D1D5DB" },
+                  }}
+                >
+                  <RefreshIcon sx={{ fontSize: 17 }} />
+                </IconButton>
+              </Tooltip>
+
+              <Tooltip title="Settings">
+                <IconButton
+                  size="small"
+                  onClick={(e) => setSettingsMenuAnchor(e.currentTarget)}
+                  sx={{
+                    borderRadius: 1,
+                    border: "1px solid #E5E7EB",
+                    width: 30,
+                    height: 30,
+                    "&:hover": { backgroundColor: "#F9FAFB", borderColor: "#D1D5DB" },
+                  }}
+                >
+                  <SettingsIcon sx={{ fontSize: 17 }} />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          </Stack>
+
+          {/* Search and Button Row */}
+          <Stack direction="row" spacing={0.75} alignItems="center">
+            <TextField
+              size="small"
+              placeholder={`Search ${module.label.toLowerCase()}...`}
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ color: "text.secondary", mr: 1, fontSize: 20 }} />,
+              }}
+              sx={{
+                flexGrow: 1,
+                "& .MuiOutlinedInput-root": {
+                  backgroundColor: "#FFFFFF",
+                  borderRadius: 2,
+                  "&:hover": {
+                    backgroundColor: "#F9FAFB",
+                  },
+                  "& fieldset": {
+                    borderColor: "#E5E7EB",
+                  },
+                  "&:hover fieldset": {
+                    borderColor: "#D1D5DB",
+                  },
+                  "&.Mui-focused fieldset": {
+                    borderColor: "#6366F1",
+                    borderWidth: "1px",
+                  },
+                },
+              }}
+            />
+
+            {canCreate && (
+              <Button
+                variant="contained"
+                onClick={() => navigate(`/${module.key}/new`)}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: "none",
+                  fontWeight: 600,
+                  px: 2.5,
+                  fontSize: "0.86rem",
+                  backgroundColor: "#6366F1",
+                  color: "#FFFFFF",
+                  boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+                  minWidth: "auto",
+                  whiteSpace: "nowrap",
+                  "&:hover": {
+                    backgroundColor: "#4F46E5",
+                    boxShadow: "0 2px 4px 0 rgba(0, 0, 0, 0.1)",
+                  },
+                }}
+              >
+                New
+              </Button>
+            )}
+          </Stack>
+        </Stack>
+      </Box>
 
       {activeFilterCount > 0 && (
         <Stack direction="row" spacing={1} sx={{ px: 2, pb: 1, flexWrap: "wrap", gap: 1 }}>
@@ -306,57 +1257,220 @@ export default function GenericListView({ module }: Props) {
         />
       )}
 
-      <Box sx={{ flexGrow: 1, px: 2, pb: 2, overflow: "auto" }}>
+      <Box sx={{ flexGrow: 1, px: { xs: 0, sm: 2 }, pb: { xs: 0, sm: 2 } }}>
         {groupedRows ? (
-          <Box>
-            <Alert severity="info" variant="outlined" sx={{ mb: 1.5, py: 0 }}>
+          <Box sx={{ height: "100%" }}>
+            <Alert severity="info" variant="outlined" sx={{ mb: 1.5, py: 0, mx: { xs: 2, sm: 0 } }}>
               Grouped by {groupBy.map((g) => module.fields.find((f) => f.name === g)?.label ?? g).join(" · ")} —
               across the {rows.length} record(s) loaded on this page. Ungroup to select rows.
             </Alert>
+
             {groupedRows.map(([key, groupRows]) => (
-              <Accordion key={key} defaultExpanded disableGutters sx={{ mb: 1 }}>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Accordion key={key} defaultExpanded disableGutters sx={{ mb: 1, boxShadow: "none", border: "1px solid #E5E7EB", borderRadius: 1, mx: { xs: 2, sm: 0 } }}>
+                <AccordionSummary
+                  expandIcon={<ExpandMoreIcon />}
+                  sx={{
+                    backgroundColor: "#FAFAFA",
+                    borderBottom: "1px solid #E5E7EB",
+                    minHeight: "40px !important",
+                    maxHeight: "40px !important",
+                    height: "40px !important",
+                    "&.Mui-expanded": {
+                      minHeight: "40px !important",
+                      maxHeight: "40px !important",
+                      height: "40px !important",
+                    },
+                  }}
+                >
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography variant="subtitle2">{key}</Typography>
-                    <Chip size="small" label={groupRows.length} />
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: "0.9375rem" }}>{key}</Typography>
+                    <Chip size="small" label={groupRows.length} sx={{ height: 20, fontSize: "0.75rem" }} />
                   </Stack>
                 </AccordionSummary>
-                <AccordionDetails sx={{ p: 0 }}>
-                  <DataGrid {...gridProps} rows={groupRows} autoHeight hideFooter />
+                <AccordionDetails sx={{ p: 0, overflowX: { xs: "auto", md: "visible" } }}>
+                  <Box sx={{ minWidth: { xs: "100%", md: "auto" } }}>
+                    <DataGrid
+                      {...gridProps}
+                      rows={groupRows}
+                      autoHeight
+                      hideFooter
+                      sx={{
+                        ...gridProps.sx,
+                        border: "none",
+                        "& .MuiDataGrid-columnHeaders": {
+                          display: "flex",
+                        },
+                        "& .MuiDataGrid-virtualScroller": {
+                          overflowX: "visible !important",
+                        },
+                        "& .MuiDataGrid-main": {
+                          overflowX: "visible !important",
+                        },
+                      }}
+                    />
+                  </Box>
                 </AccordionDetails>
               </Accordion>
             ))}
           </Box>
         ) : (
-          <DataGrid
-            {...gridProps}
-            rows={rows}
-            rowCount={data?.count ?? 0}
-            loading={isLoading || isFetching}
-            paginationMode="server"
-            sortingMode="server"
-            paginationModel={{ page, pageSize }}
-            onPaginationModelChange={(m) => { setPage(m.page); setPageSize(m.pageSize); }}
-            pageSizeOptions={[10, 25, 50, 100]}
-            sortModel={sortModel}
-            onSortModelChange={setSortModel}
-          />
+          <Box sx={{
+            height: "100%",
+            width: "100%",
+            overflowX: { xs: "auto", md: "visible" },
+            overflowY: "visible",
+            "& .MuiDataGrid-root": { minWidth: { xs: "100%", md: "auto" } },
+            "& .MuiDataGrid-virtualScroller": {
+              overflowX: { xs: "visible !important", md: "auto !important" },
+            },
+            "& .MuiDataGrid-main": {
+              overflowX: { xs: "visible !important", md: "auto !important" },
+            },
+          }}>
+            <Box sx={{ minWidth: { xs: "100%", md: "auto" } }}>
+              <DataGrid
+                {...gridProps}
+                rows={rows}
+                rowCount={data?.count ?? 0}
+                loading={isLoading || isFetching}
+                paginationMode="server"
+                sortingMode="server"
+                paginationModel={{ page, pageSize }}
+                onPaginationModelChange={(m) => { setPage(m.page); setPageSize(m.pageSize); }}
+                pageSizeOptions={[10, 25, 50, 100]}
+                sortModel={sortModel}
+                onSortModelChange={setSortModel}
+              />
+            </Box>
+          </Box>
         )}
       </Box>
 
-      {/* Column visibility menu */}
-      <Menu anchorEl={colMenuAnchor} open={!!colMenuAnchor} onClose={() => setColMenuAnchor(null)}>
-        {module.fields.map((f) => (
-          <MenuItem
-            key={f.name}
-            dense
-            onClick={() => setColVisibility((prev) => ({ ...prev, [f.name]: prev[f.name] === false }))}
+      {/* Column visibility dialog */}
+      <Dialog
+        open={colDialogOpen}
+        onClose={() => setColDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            minHeight: 400,
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600, fontSize: "1.125rem" }}>
+            Select Columns
+          </Typography>
+          <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
+            Choose the columns to display in the table.
+          </Typography>
+        </DialogTitle>
+        <Divider />
+        <DialogContent sx={{ pt: 2, pb: 2 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 1,
+            }}
           >
-            <Checkbox size="small" checked={colVisibility[f.name] !== false} />
-            <ListItemText primary={f.label} />
-          </MenuItem>
-        ))}
-      </Menu>
+            {module.fields.map((f) => (
+              <Box
+                key={f.name}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  px: 1,
+                  py: 0.75,
+                  borderRadius: 1,
+                  cursor: "pointer",
+                  "&:hover": {
+                    backgroundColor: "#F9FAFB",
+                  },
+                }}
+                onClick={() =>
+                  setPendingColVisibility((prev) => ({
+                    ...prev,
+                    [f.name]: prev[f.name] === false,
+                  }))
+                }
+              >
+                <DragIndicatorIcon sx={{ fontSize: 18, color: "#9CA3AF" }} />
+                <Checkbox
+                  size="small"
+                  checked={pendingColVisibility[f.name] !== false}
+                  sx={{
+                    padding: 0.5,
+                    "& .MuiSvgIcon-root": {
+                      fontSize: 18,
+                    },
+                  }}
+                />
+                <Typography variant="body2" sx={{ fontSize: "0.86rem", userSelect: "none" }}>
+                  {f.label}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        </DialogContent>
+        <Divider />
+        <DialogActions sx={{ px: 3, py: 2, justifyContent: "space-between" }}>
+          <Button
+            onClick={() => {
+              setPendingColVisibility({});
+              setColVisibility({});
+              setColDialogOpen(false);
+            }}
+            sx={{
+              textTransform: "none",
+              color: "#6366F1",
+              fontWeight: 500,
+              "&:hover": {
+                backgroundColor: "#EEF2FF",
+              },
+            }}
+          >
+            Reset to default
+          </Button>
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <Button
+              onClick={() => setColDialogOpen(false)}
+              sx={{
+                textTransform: "none",
+                color: "text.secondary",
+                "&:hover": {
+                  backgroundColor: "#F3F4F6",
+                },
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => {
+                setColVisibility(pendingColVisibility);
+                setColDialogOpen(false);
+              }}
+              sx={{
+                textTransform: "none",
+                fontWeight: 600,
+                backgroundColor: "#6366F1",
+                color: "#FFFFFF",
+                boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+                "&:hover": {
+                  backgroundColor: "#4F46E5",
+                  boxShadow: "0 2px 4px 0 rgba(0, 0, 0, 0.1)",
+                },
+              }}
+            >
+              Apply
+            </Button>
+          </Box>
+        </DialogActions>
+      </Dialog>
 
       {/* Settings menu — Import, Export and Delete live here, each gated by
           the caller's RBAC flags (and re-checked server-side). */}
@@ -412,7 +1526,18 @@ export default function GenericListView({ module }: Props) {
       </Menu>
 
       {/* Dynamic group-by menu */}
-      <Menu anchorEl={groupMenuAnchor} open={!!groupMenuAnchor} onClose={() => setGroupMenuAnchor(null)}>
+      <Menu
+        anchorEl={groupMenuAnchor}
+        open={!!groupMenuAnchor}
+        onClose={() => setGroupMenuAnchor(null)}
+        slotProps={{
+          paper: {
+            sx: {
+              minWidth: groupMenuAnchor?.offsetWidth || 'auto',
+            }
+          }
+        }}
+      >
         {groupableFields.length === 0 && <MenuItem disabled>Nothing to group by on this screen</MenuItem>}
         {groupableFields.map((f) => (
           <MenuItem
@@ -484,7 +1609,7 @@ export default function GenericListView({ module }: Props) {
       {/* Dynamic filter dialog */}
       <Dialog open={filterDialogOpen} onClose={() => setFilterDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>Filter {module.label}</DialogTitle>
-        <DialogContent sx={{ pt: 1 }}>
+        <DialogContent sx={{ pt: "10px !important" }}>
           <FilterBuilder
             fields={filterableFields}
             conditions={pendingConditions}
