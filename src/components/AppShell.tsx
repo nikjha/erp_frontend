@@ -26,6 +26,7 @@ import { useModuleStatus } from "../hooks/useModuleStatus";
 import { tokens } from "../theme";
 import type { ModuleConfig } from "../types/module";
 import NotificationsMenu from "./NotificationsMenu";
+import AppFooter from "./AppFooter";
 import logo from "../assets/nikerp-logo.png";
 
 const ICONS: Record<string, ReactNode> = {
@@ -576,6 +577,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
         )}
         {children}
       </Box>
+
+      {/* Outside the scrolling area, so the build stamp is always in view
+          rather than needing a scroll to the bottom of a long list. */}
+      <AppFooter />
     </Box>
   );
 }

@@ -12,7 +12,11 @@ export function useRelationOptions(
   const filterKey = extraFilters ? JSON.stringify(extraFilters) : "";
 
   const query = useQuery({
-    queryKey: ["relation-options", moduleKey, filterKey],
+    // The label field belongs in the key: two fields can point at the same
+    // module but display it differently (a currency picker shows `code`,
+    // another shows `name`), and without it the first one to load wins the
+    // cache entry and the other renders the wrong text.
+    queryKey: ["relation-options", moduleKey, effectiveLabelField, filterKey],
     queryFn: async () => {
       if (!module) return [];
       const api = new GenericApi(module.endpoint);

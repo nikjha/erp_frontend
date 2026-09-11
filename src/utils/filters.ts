@@ -28,7 +28,12 @@ export const OPERATOR_LABELS: Record<FilterOperator, string> = {
 
 const TEXT_OPERATORS: FilterOperator[] = ["icontains", "exact", "istartswith", "iendswith", "not", "isnull"];
 const NUMERIC_OPERATORS: FilterOperator[] = ["exact", "not", "gt", "gte", "lt", "lte", "range", "isnull"];
-const DATE_OPERATORS: FilterOperator[] = ["exact", "gte", "lte", "range", "isnull"];
+// "between" leads for dates because a from/to window is what anyone
+// filtering a date column actually wants — nobody asks for records stamped
+// at one exact instant. It being first also makes it the default operator
+// for a date field (see defaultOperatorFor), so picking a date column in
+// the builder puts From and To on screen straight away.
+const DATE_OPERATORS: FilterOperator[] = ["range", "gte", "lte", "exact", "isnull"];
 const CHOICE_OPERATORS: FilterOperator[] = ["exact", "not", "in", "isnull"];
 // A relation is picked one record at a time from a live lookup, so there is
 // no static option list to build an "is any of" multi-select from.

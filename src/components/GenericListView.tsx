@@ -36,7 +36,7 @@ import Avatar from "@mui/material/Avatar";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSnackbar } from "notistack";
 
-import type { ModuleConfig, SavedView, FilterCondition } from "../types/module";
+import type { ModuleConfig, SavedView, FilterCondition, FieldConfig } from "../types/module";
 import { GenericApi } from "../api/genericApi";
 import { intentHeaders } from "../api/client";
 import { useSavedViews } from "../hooks/useSavedViews";
@@ -46,6 +46,7 @@ import { buildFilterParams, describeCondition, newCondition } from "../utils/fil
 import BulkActionsToolbar from "./BulkActionsToolbar";
 import ImportDialog from "./ImportDialog";
 import FilterBuilder from "./FilterBuilder";
+import QuickLinksBar from "./QuickLinksBar";
 
 /**
  * Generate consistent color for a given string using hash
@@ -280,6 +281,21 @@ interface Props {
 
 const UNGROUPED = "— None —";
 
+/**
+ * Filter fields every screen gets for free.
+ *
+ * Both columns come from `core.models.AuditModel`, so every record in the
+ * product has them, and "show me what came in between these two dates" is
+ * asked of every list there is. Offering them here rather than repeating
+ * them in twenty ModuleConfigs means no screen can be missing date
+ * filtering — and a module that declares `created_date` itself still wins,
+ * so it can relabel or re-type the field on its own terms.
+ */
+const AUDIT_DATE_FILTERS: FieldConfig[] = [
+  { name: "created_date", label: "Created On", type: "datetime", filterable: true },
+  { name: "modified_date", label: "Last Modified", type: "datetime", filterable: true },
+];
+
 export default function GenericListView({ module }: Props) {
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
@@ -294,7 +310,19 @@ export default function GenericListView({ module }: Props) {
   const canCreate = canModule(module, "can_create");
 
   const listFields = useMemo(() => module.fields.filter((f) => f.showInList), [module.fields]);
-  const filterableFields = useMemo(() => module.fields.filter((f) => f.filterable), [module.fields]);
+  const filterableFields = useMemo(() => {
+    const declared = module.fields.filter((f) => f.filterable);
+    const extras = AUDIT_DATE_FILTERS.filter(
+      (audit) => !declared.some((f) => f.name === audit.name)
+    ).map((audit) => {
+      // A module that lists the column itself (Companies shows "Created")
+      // keeps its own label and type — it just becomes filterable too, so
+      // the filter and the column can't disagree about what they name.
+      const own = module.fields.find((f) => f.name === audit.name);
+      return own ? { ...own, filterable: true } : audit;
+    });
+    return [...declared, ...extras];
+  }, [module.fields]);
   const groupableFields = useMemo(
     // A field is groupable when it's marked so, or when it's a low-cardinality
     // type where grouping is obviously meaningful anyway.
@@ -522,315 +550,7 @@ export default function GenericListView({ module }: Props) {
 
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      {/* Quick Links Bar - Desktop */}
-      <Box
-        sx={{
-          px: { xs: 2, sm: 3 },
-          py: 0.45,
-          backgroundColor: "#F9FAFB",
-          borderBottom: "1px solid #E5E7EB",
-          display: { xs: "none", md: "flex" },
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Stack direction="row" spacing={2} alignItems="center">
-          <Typography
-            sx={{
-              color: "text.primary",
-              fontSize: "0.75rem",
-              fontWeight: 700,
-              pl: 1,
-            }}
-          >
-            Quick Links
-          </Typography>
-          <Divider orientation="vertical" flexItem sx={{ borderColor: "#D1D5DB", borderWidth: 1 }} />
-          <Button
-            size="small"
-            sx={{
-              textTransform: "none",
-              color: "text.secondary",
-              fontSize: "0.75rem",
-              fontWeight: 400,
-              minHeight: 0,
-              py: 0.3,
-              "&:hover": { backgroundColor: "transparent", color: "primary.main" },
-            }}
-          >
-            New Customers
-          </Button>
-          <Button
-            size="small"
-            sx={{
-              textTransform: "none",
-              color: "text.secondary",
-              fontSize: "0.75rem",
-              fontWeight: 400,
-              minHeight: 0,
-              py: 0.3,
-              "&:hover": { backgroundColor: "transparent", color: "primary.main" },
-            }}
-          >
-            New Leads
-          </Button>
-          <Button
-            size="small"
-            sx={{
-              textTransform: "none",
-              color: "text.secondary",
-              fontSize: "0.75rem",
-              fontWeight: 400,
-              minHeight: 0,
-              py: 0.3,
-              "&:hover": { backgroundColor: "transparent", color: "primary.main" },
-            }}
-          >
-            Quotations
-          </Button>
-          <Button
-            size="small"
-            sx={{
-              textTransform: "none",
-              color: "text.secondary",
-              fontSize: "0.75rem",
-              fontWeight: 400,
-              minHeight: 0,
-              py: 0.3,
-              "&:hover": { backgroundColor: "transparent", color: "primary.main" },
-            }}
-          >
-            Invoices
-          </Button>
-          <Button
-            size="small"
-            sx={{
-              textTransform: "none",
-              color: "text.secondary",
-              fontSize: "0.75rem",
-              fontWeight: 400,
-              minHeight: 0,
-              py: 0.3,
-              "&:hover": { backgroundColor: "transparent", color: "primary.main" },
-            }}
-          >
-            Products
-          </Button>
-          <Button
-            size="small"
-            sx={{
-              textTransform: "none",
-              color: "text.secondary",
-              fontSize: "0.75rem",
-              fontWeight: 400,
-              minHeight: 0,
-              py: 0.3,
-              "&:hover": { backgroundColor: "transparent", color: "primary.main" },
-            }}
-          >
-            Reports
-          </Button>
-          <Button
-            size="small"
-            sx={{
-              textTransform: "none",
-              color: "text.secondary",
-              fontSize: "0.75rem",
-              fontWeight: 400,
-              minHeight: 0,
-              py: 0.3,
-              "&:hover": { backgroundColor: "transparent", color: "primary.main" },
-            }}
-          >
-            Activities
-          </Button>
-          <Divider orientation="vertical" flexItem sx={{ borderColor: "#D1D5DB", borderWidth: 1 }} />
-        </Stack>
-        <Button
-          size="small"
-          startIcon={<Typography sx={{ fontSize: "1rem" }}>❓</Typography>}
-          sx={{
-            textTransform: "none",
-            color: "text.secondary",
-            fontSize: "0.75rem",
-            fontWeight: 400,
-            minHeight: 0,
-            py: 0.3,
-            "&:hover": { backgroundColor: "transparent", color: "primary.main" },
-          }}
-        >
-          Need Help?
-        </Button>
-      </Box>
-
-      {/* Quick Links Bar - Mobile */}
-      <Box
-        sx={{
-          backgroundColor: "#F9FAFB",
-          borderBottom: "1px solid #E5E7EB",
-          display: { xs: "flex", md: "none" },
-          alignItems: "center",
-        }}
-      >
-        {/* Static Label */}
-        <Typography
-          sx={{
-            color: "text.primary",
-            fontSize: "0.7rem",
-            fontWeight: 700,
-            pl: 1.5,
-            pr: 1,
-            py: 0.75,
-            flexShrink: 0,
-            whiteSpace: "nowrap",
-          }}
-        >
-          Quick Links
-        </Typography>
-        <Divider orientation="vertical" flexItem sx={{ borderColor: "#D1D5DB" }} />
-
-        {/* Scrollable Links */}
-        <Box
-          sx={{
-            overflowX: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 0,
-            flexGrow: 1,
-            "&::-webkit-scrollbar": {
-              display: "none",
-            },
-            scrollbarWidth: "none",
-          }}
-        >
-          <Button
-            size="small"
-            sx={{
-              textTransform: "none",
-              color: "text.secondary",
-              fontSize: "0.7rem",
-              fontWeight: 400,
-              minWidth: "auto",
-              minHeight: 0,
-              py: 0.75,
-              px: 1.5,
-              whiteSpace: "nowrap",
-              borderRadius: 0,
-              "&:hover": { backgroundColor: "rgba(99, 102, 241, 0.08)", color: "primary.main" },
-            }}
-          >
-            New Customers
-          </Button>
-          <Button
-            size="small"
-            sx={{
-              textTransform: "none",
-              color: "text.secondary",
-              fontSize: "0.7rem",
-              fontWeight: 400,
-              minWidth: "auto",
-              minHeight: 0,
-              py: 0.75,
-              px: 1.5,
-              whiteSpace: "nowrap",
-              borderRadius: 0,
-              "&:hover": { backgroundColor: "rgba(99, 102, 241, 0.08)", color: "primary.main" },
-            }}
-          >
-            New Leads
-          </Button>
-          <Button
-            size="small"
-            sx={{
-              textTransform: "none",
-              color: "text.secondary",
-              fontSize: "0.7rem",
-              fontWeight: 400,
-              minWidth: "auto",
-              minHeight: 0,
-              py: 0.75,
-              px: 1.5,
-              whiteSpace: "nowrap",
-              borderRadius: 0,
-              "&:hover": { backgroundColor: "rgba(99, 102, 241, 0.08)", color: "primary.main" },
-            }}
-          >
-            Quotations
-          </Button>
-          <Button
-            size="small"
-            sx={{
-              textTransform: "none",
-              color: "text.secondary",
-              fontSize: "0.7rem",
-              fontWeight: 400,
-              minWidth: "auto",
-              minHeight: 0,
-              py: 0.75,
-              px: 1.5,
-              whiteSpace: "nowrap",
-              borderRadius: 0,
-              "&:hover": { backgroundColor: "rgba(99, 102, 241, 0.08)", color: "primary.main" },
-            }}
-          >
-            Invoices
-          </Button>
-          <Button
-            size="small"
-            sx={{
-              textTransform: "none",
-              color: "text.secondary",
-              fontSize: "0.7rem",
-              fontWeight: 400,
-              minWidth: "auto",
-              minHeight: 0,
-              py: 0.75,
-              px: 1.5,
-              whiteSpace: "nowrap",
-              borderRadius: 0,
-              "&:hover": { backgroundColor: "rgba(99, 102, 241, 0.08)", color: "primary.main" },
-            }}
-          >
-            Products
-          </Button>
-          <Button
-            size="small"
-            sx={{
-              textTransform: "none",
-              color: "text.secondary",
-              fontSize: "0.7rem",
-              fontWeight: 400,
-              minWidth: "auto",
-              minHeight: 0,
-              py: 0.75,
-              px: 1.5,
-              whiteSpace: "nowrap",
-              borderRadius: 0,
-              "&:hover": { backgroundColor: "rgba(99, 102, 241, 0.08)", color: "primary.main" },
-            }}
-          >
-            Reports
-          </Button>
-          <Button
-            size="small"
-            sx={{
-              textTransform: "none",
-              color: "text.secondary",
-              fontSize: "0.7rem",
-              fontWeight: 400,
-              minWidth: "auto",
-              minHeight: 0,
-              py: 0.75,
-              px: 1.5,
-              whiteSpace: "nowrap",
-              borderRadius: 0,
-              "&:hover": { backgroundColor: "rgba(99, 102, 241, 0.08)", color: "primary.main" },
-            }}
-          >
-            Activities
-          </Button>
-        </Box>
-      </Box>
+      <QuickLinksBar />
 
       {/* Main Toolbar */}
       <Box
@@ -1241,7 +961,10 @@ export default function GenericListView({ module }: Props) {
             <Chip
               key={condition.id}
               size="small"
-              label={describeCondition(condition, module.fields.find((f) => f.name === condition.field))}
+              // Look the field up in the same list the builder offered, or
+              // a filter on a field the module doesn't declare (the audit
+              // dates) would print its raw column name in the chip.
+              label={describeCondition(condition, filterableFields.find((f) => f.name === condition.field))}
               onDelete={() => { setConditions(conditions.filter((c) => c.id !== condition.id)); setPage(0); }}
             />
           ))}

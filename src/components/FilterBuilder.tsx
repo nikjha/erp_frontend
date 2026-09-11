@@ -97,19 +97,31 @@ export default function FilterBuilder({ fields, conditions, onChange }: Props) {
     }
 
     if (condition.operator === "range") {
-      const inputType = field.type === "date" || field.type === "datetime" ? "date" : "number";
+      const isDate = field.type === "date" || field.type === "datetime";
+      const from = (condition.value as string) ?? "";
+      const to = (condition.value2 as string) ?? "";
       return (
         <Stack direction="row" spacing={1} sx={{ width: "100%" }}>
           <TextField
-            size="small" fullWidth label="From" type={inputType}
-            slotProps={{ inputLabel: { shrink: true } }}
-            value={(condition.value as string) ?? ""}
+            size="small" fullWidth label="From" type={isDate ? "date" : "number"}
+            slotProps={{
+              inputLabel: { shrink: true },
+              // Each bound caps the other, so a backwards window — a "to"
+              // before its "from" — can't be picked in the first place.
+              // A backwards range isn't an error server-side, it just
+              // silently returns nothing, which reads as "no data".
+              htmlInput: isDate && to ? { max: to } : undefined,
+            }}
+            value={from}
             onChange={(e) => patch(condition.id, { value: e.target.value })}
           />
           <TextField
-            size="small" fullWidth label="To" type={inputType}
-            slotProps={{ inputLabel: { shrink: true } }}
-            value={(condition.value2 as string) ?? ""}
+            size="small" fullWidth label="To" type={isDate ? "date" : "number"}
+            slotProps={{
+              inputLabel: { shrink: true },
+              htmlInput: isDate && from ? { min: from } : undefined,
+            }}
+            value={to}
             onChange={(e) => patch(condition.id, { value2: e.target.value })}
           />
         </Stack>
